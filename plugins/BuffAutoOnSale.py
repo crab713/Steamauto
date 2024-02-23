@@ -448,7 +448,7 @@ class BuffAutoOnSale:
         time.sleep(sleep_seconds_to_prevent_buff_ban)
         page_num = 1 if int(goods_id) not in box_id_list else 7
         if int(goods_id) == 956398:
-            page_num = 5
+            page_num = 3
         url = (
                 "https://buff.163.com/api/market/goods/sell_order?goods_id="
                 + str(goods_id)
