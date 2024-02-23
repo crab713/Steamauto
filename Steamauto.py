@@ -1,4 +1,6 @@
 import os
+os.environ["http_proxy"] = "http://127.0.0.1:8892"
+os.environ["https_proxy"] = "http://127.0.0.1:8892"
 import pickle
 import re
 import shutil

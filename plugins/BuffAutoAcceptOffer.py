@@ -208,7 +208,7 @@ class BuffAutoAcceptOffer:
                         self.logger.info("[BuffAutoAcceptOffer] Steam会话已更新")
                         steam_session_path = os.path.join(SESSION_FOLDER, self.steam_client.username.lower() + ".pkl")
                         with open(steam_session_path, "wb") as f:
-                            pickle.dump(self.steam_client.session, f)
+                            pickle.dump(self.steam_client, f)
                 self.logger.info("[BuffAutoAcceptOffer] 正在进行BUFF待发货/待收货饰品检查...")
                 username = self.check_buff_account_state()
                 if username == "":
@@ -278,6 +278,7 @@ class BuffAutoAcceptOffer:
                             f.write(json5.dumps(response_json, indent=4))
                     trades = response_json["data"]
                 trade_offer_to_confirm = set()
+                last_finish_num = len(ignored_offer)
                 for game in SUPPORT_GAME_TYPES:
                     if self.development_mode and os.path.exists(TO_DELIVER_DEV_FILE_PATH.format(game=game["game"])):
                         self.logger.info("[BuffAutoAcceptOffer] 开发者模式已开启, 使用本地待确认供应文件")
@@ -466,5 +467,8 @@ class BuffAutoAcceptOffer:
             except Exception as e:
                 self.logger.error(e, exc_info=True)
                 self.logger.info("[BuffAutoAcceptOffer] 出现未知错误, 稍后再试! ")
-            self.logger.info("[BuffAutoAcceptOffer] 将在{0}秒后再次检查待发货订单信息! ".format(str(interval)))
-            time.sleep(interval)
+            if len(ignored_offer) <= last_finish_num:
+                self.logger.info("[BuffAutoAcceptOffer] 将在{0}秒后再次检查待发货订单信息! ".format(str(interval)))
+                time.sleep(interval)
+            else:
+                time.sleep(20)

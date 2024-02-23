@@ -20,6 +20,7 @@ from utils.static import APPRISE_ASSET_FOLDER, BUFF_ACCOUNT_DEV_FILE_PATH, BUFF_
     SESSION_FOLDER
 from utils.tools import get_encoding
 
+from MysqlClient import mysql_client
 
 def format_str(text: str, trade):
     for good in trade["goods_infos"]:
@@ -71,6 +72,7 @@ class BuffAutoOnSale:
         self.asset = AppriseAsset(plugin_paths=[os.path.join(os.path.dirname(__file__), "..", APPRISE_ASSET_FOLDER)])
         self.session = requests.session()
         self.lowest_price_cache = {}
+        self.supply_price_cache = {}
         self.unfinish_supply_order_list = [] # 等待buff发起报价, 之后进行确认报价的订单, [{order_id, create_time}]
 
     def init(self) -> bool:
@@ -288,14 +290,14 @@ class BuffAutoOnSale:
             sell_price = price
             if sell_price == -1:
                 sell_price = self.get_lowest_sell_price(item["goods_id"], game, app_id, min_paint_wear, max_paint_wear)
-            if supply_buy_orders:
-                highest_buy_order = self.get_highest_buy_order(item["goods_id"], game, app_id, paint_wear=paint_wear,
-                                                               require_auto_accept=only_auto_accept,
-                                                               supported_payment_methods=supported_payment_method)
-                if sell_price <= min_price or sell_price <= float(highest_buy_order["price"]):
+            if supply_buy_orders and sell_price <= min_price:
+                highest_buy_order = self.get_highest_buy_order(item["goods_id"], sell_price, game, app_id, paint_wear=paint_wear,
+                                                                require_auto_accept=only_auto_accept,
+                                                                supported_payment_methods=supported_payment_method)
+                if "price" in highest_buy_order.keys() and sell_price <= float(highest_buy_order["price"]):
                     # 直接供应给最高报价
                     self.logger.info("[BuffAutoOnSale] 商品 " + item["market_hash_name"] +
-                                     " 将供应给最高报价 " + str(highest_buy_order["price"]))
+                                        " 将供应给最高报价 " + str(highest_buy_order["price"]))
                     success = self.supply_item_to_buy_order(item, highest_buy_order, game, app_id)
                     if success:
                         if "on_sale_notification" in self.config["buff_auto_on_sale"]:
@@ -311,7 +313,7 @@ class BuffAutoOnSale:
                             )
                         continue
             if sell_price != -1:
-                sell_price = sell_price - 0.01
+                sell_price = round(sell_price - 0.01, 2)
                 self.logger.info("[BuffAutoOnSale] 商品 " + item["market_hash_name"] +
                                  " 将使用价格 " + str(sell_price) + " 进行上架")
                 assets.append(
@@ -360,8 +362,13 @@ class BuffAutoOnSale:
             self.logger.error("[BuffAutoOnSale] 上架BUFF商品失败, 请检查buff_cookies.txt或稍后再试! ")
             return {}
 
-    def get_highest_buy_order(self, goods_id, game="csgo", app_id=730, paint_wear=-1, require_auto_accept=True,
+    def get_highest_buy_order(self, goods_id, sell_price, game="csgo", app_id=730, paint_wear=-1, require_auto_accept=True,
                               supported_payment_methods=None):
+        cache = mysql_client.get_highest_buy(goods_id)
+        if (cache is not None and sell_price > cache["price"] and cache["cache_time"] >=
+                datetime.datetime.now() - datetime.timedelta(minutes=20)):
+            return {}
+
         sleep_seconds_to_prevent_buff_ban = 10
         if 'sleep_seconds_to_prevent_buff_ban' in self.config["buff_auto_on_sale"]:
             sleep_seconds_to_prevent_buff_ban = self.config["buff_auto_on_sale"]["sleep_seconds_to_prevent_buff_ban"]
@@ -375,9 +382,9 @@ class BuffAutoOnSale:
                 + "&appid="
                 + str(app_id)
         )
+        self.logger.info("[BuffAutoOnSale] 获取BUFF商品最高求购")
         self.logger.info("[BuffAutoOnSale] 为了避免被封IP, 休眠" + str(sleep_seconds_to_prevent_buff_ban) + "秒")
         time.sleep(sleep_seconds_to_prevent_buff_ban)
-        self.logger.info("[BuffAutoOnSale] 正在获取BUFF商品最高求购")
         response = self.session.get(url, headers=self.buff_headers).json()
         if response["code"] != "OK":
             return {}
@@ -411,16 +418,27 @@ class BuffAutoOnSale:
                         break
                 if not match_specific:
                     continue
+            mysql_client.insert_highest_buy(goods_id, order["price"], int(time.time()))
             return order
         return {}
 
     def get_lowest_sell_price(self, goods_id, game="csgo", app_id=730, min_paint_wear=0, max_paint_wear=1.0):
+        box_id_list = [857515, 900464, 921379, 886606, 781534] # 常驻武器箱的id
         sleep_seconds_to_prevent_buff_ban = 10
         if 'sleep_seconds_to_prevent_buff_ban' in self.config["buff_auto_on_sale"]:
             sleep_seconds_to_prevent_buff_ban = self.config["buff_auto_on_sale"]["sleep_seconds_to_prevent_buff_ban"]
         goods_key = str(goods_id) + ',' + str(min_paint_wear) + ',' + str(max_paint_wear)
+        # 打补丁(
+        cache = mysql_client.get_lowest_sell(goods_key)
+        if cache is not None:
+            self.lowest_price_cache[goods_key] = cache
         if goods_key in self.lowest_price_cache:
-            if (self.lowest_price_cache[goods_key]["cache_time"] >= datetime.datetime.now() -
+            if int(goods_id) in box_id_list:
+                if (self.lowest_price_cache[goods_key]["cache_time"] >= datetime.datetime.now() -
+                        datetime.timedelta(minutes=5)):
+                    lowest_price = self.lowest_price_cache[goods_key]["lowest_price"]
+                    return lowest_price
+            elif (self.lowest_price_cache[goods_key]["cache_time"] >= datetime.datetime.now() -
                     datetime.timedelta(hours=1)):
                 lowest_price = self.lowest_price_cache[goods_key]["lowest_price"]
                 return lowest_price
@@ -428,10 +446,11 @@ class BuffAutoOnSale:
         self.logger.info("[BuffAutoOnSale] 为了避免被封IP, 休眠" +
                          str(sleep_seconds_to_prevent_buff_ban) + "秒")
         time.sleep(sleep_seconds_to_prevent_buff_ban)
+        page_num = 1 if int(goods_id) not in box_id_list else 7
         url = (
                 "https://buff.163.com/api/market/goods/sell_order?goods_id="
                 + str(goods_id)
-                + "&page_num=1&page_size=24&allow_tradable_cooldown=1&sort_by=default&game="
+                + "&page_num={}&page_size=24&allow_tradable_cooldown=1&sort_by=default&game=".format(page_num)
                 + game
                 + "&appid="
                 + str(app_id)
@@ -444,7 +463,7 @@ class BuffAutoOnSale:
             url = (
                     "https://buff.163.com/api/market/goods/sell_order?goods_id="
                     + str(goods_id)
-                    + "&page_num=1&page_size=24&allow_tradable_cooldown=1&sort_by=default&game="
+                    + "&page_num={}&page_size=24&allow_tradable_cooldown=1&sort_by=default&game=".format(page_num)
                     + game
                     + "&appid="
                     + str(app_id)
@@ -458,8 +477,12 @@ class BuffAutoOnSale:
                 else:
                     self.logger.info("[BuffAutoOnSale] 无商品")
                     return -1
-            lowest_price = float(response_json["data"]["items"][0]["price"])
+            max_length = len(response_json["data"]["items"])
+            index = 3 if max_length > 3 else 0
+            lowest_price = float(response_json["data"]["items"][index]["price"])
             self.lowest_price_cache[goods_key] = {"lowest_price": lowest_price, "cache_time": datetime.datetime.now()}
+            # 还是打补丁, cache不删(
+            mysql_client.insert_lowest_price(goods_key, lowest_price, int(time.time()))
             return lowest_price
         else:
             if response_json["code"] == "Captcha Validate Required":
@@ -547,42 +570,37 @@ class BuffAutoOnSale:
                 time.sleep(sleep_interval)
                 continue
             try:
-                while True:
-                    items_count_this_loop = 0
-                    for game in SUPPORT_GAME_TYPES:
-                        self.logger.info("[BuffAutoOnSale] 正在检查 " + game["game"] + " 库存...")
-                        inventory_json = self.get_buff_inventory(
-                            state="cansell", sort_by="price.desc", game=game["game"], app_id=game["app_id"],
-                            force=force_refresh
+                items_count_this_loop = 0
+                for game in SUPPORT_GAME_TYPES:
+                    self.logger.info("[BuffAutoOnSale] 正在检查 " + game["game"] + " 库存...")
+                    inventory_json = self.get_buff_inventory(
+                        # state="cansell", sort_by="price.desc", game=game["game"], app_id=game["app_id"],
+                        state="cansell", game=game["game"], app_id=game["app_id"],
+                        force=force_refresh
+                    )
+                    items = inventory_json["items"]
+                    items_count_this_loop += len(items)
+                    if len(items) != 0:
+                        self.logger.info(
+                            "[BuffAutoOnSale] 检查到 " + game["game"] + " 库存有 " + str(
+                                len(items)) + " 件可出售商品, 正在上架..."
                         )
-                        items = inventory_json["items"]
-                        items_count_this_loop += len(items)
-                        if len(items) != 0:
-                            self.logger.info(
-                                "[BuffAutoOnSale] 检查到 " + game["game"] + " 库存有 " + str(
-                                    len(items)) + " 件可出售商品, 正在上架..."
-                            )
-                            items_to_sell = []
-                            for item in items:
-                                item["asset_info"]["market_hash_name"] = item["market_hash_name"]
-                                items_to_sell.append(item["asset_info"])
-                            # 5个一组上架
-                            items_to_sell_group = [items_to_sell[i:i + 5] for i in range(0, len(items_to_sell), 5)]
-                            for items_to_sell in items_to_sell_group:
-                                self.put_item_on_sale(items=items_to_sell, price=-1, description=description,
-                                                      game=game["game"], app_id=game["app_id"],
-                                                      use_range_price=use_range_price)
-                                if 'buy_order' in self.config["buff_auto_on_sale"] and \
-                                        self.config["buff_auto_on_sale"]["buy_order"]["enable"]:
-                                    self.confirm_supply_order()
-                            self.logger.info("[BuffAutoOnSale] BUFF商品上架成功! ")
-                        else:
-                            self.logger.info("[BuffAutoOnSale] 检查到 " + game["game"] + " 库存为空, 跳过上架")
-                        self.logger.info("[BuffAutoOnSale] 休眠30秒, 防止请求过快被封IP")
-                        time.sleep(30)
-                    if items_count_this_loop == 0:
-                        self.logger.info("[BuffAutoOnSale] 库存为空, 本批次上架结束!")
-                        break
+                        items_to_sell = []
+                        for item in items:
+                            item["asset_info"]["market_hash_name"] = item["market_hash_name"]
+                            items_to_sell.append(item["asset_info"])
+                        # 5个一组上架
+                        items_to_sell_group = [items_to_sell[i:i + 5] for i in range(0, len(items_to_sell), 5)]
+                        for items_to_sell in items_to_sell_group:
+                            self.put_item_on_sale(items=items_to_sell, price=-1, description=description,
+                                                    game=game["game"], app_id=game["app_id"],
+                                                    use_range_price=use_range_price)
+                            # if 'buy_order' in self.config["buff_auto_on_sale"] and \
+                            #         self.config["buff_auto_on_sale"]["buy_order"]["enable"]:
+                            #     self.confirm_supply_order()
+                        self.logger.info("[BuffAutoOnSale] BUFF商品上架成功! ")
+                    else:
+                        self.logger.info("[BuffAutoOnSale] 检查到 " + game["game"] + " 库存为空, 跳过上架")
             except ProxyError:
                 self.logger.error('[BuffAutoOnSale] 代理异常, 本软件可不需要代理或任何VPN')
                 self.logger.error('[BuffAutoOnSale] 可以尝试关闭代理或VPN后重启软件')
@@ -600,9 +618,9 @@ class BuffAutoOnSale:
             sleep_cnt = int(sleep_interval // 60)
             for _ in range(sleep_cnt):
                 time.sleep(60)
-                if 'buy_order' in self.config["buff_auto_on_sale"] and \
-                        self.config["buff_auto_on_sale"]["buy_order"]["enable"]:
-                    self.confirm_supply_order()
+                # if 'buy_order' in self.config["buff_auto_on_sale"] and \
+                #         self.config["buff_auto_on_sale"]["buy_order"]["enable"]:
+                #     self.confirm_supply_order()
 
     def supply_item_to_buy_order(self, item, highest_buy_order, game, app_id):
         sleep_seconds_to_prevent_buff_ban = 10
@@ -618,8 +636,9 @@ class BuffAutoOnSale:
                 item
             ]
         }
-        self.logger.info("[BuffAutoOnSale] 为了避免被封IP, 休眠" + str(sleep_seconds_to_prevent_buff_ban) + "秒")
-        time.sleep(sleep_seconds_to_prevent_buff_ban)
+        # self.logger.info("[BuffAutoOnSale] 为了避免被封IP, 休眠" + str(sleep_seconds_to_prevent_buff_ban) + "秒")
+        # time.sleep(sleep_seconds_to_prevent_buff_ban)
+        time.sleep(1)
         self.logger.info("[BuffAutoOnSale] 正在供应商品至最高报价...")
         self.session.get("https://buff.163.com/api/market/steam_trade", headers=self.buff_headers)
         csrf_token = self.session.cookies.get("csrf_token")
@@ -677,7 +696,7 @@ class BuffAutoOnSale:
         self.logger.info("[BuffAutoOnSale] 处理等待发起报价的订单, 共有{}个".format(len(self.unfinish_supply_order_list)))
         for index, order in enumerate(self.unfinish_supply_order_list):
             order_id, create_time = order["order_id"], order["create_time"]
-            if time.time() - create_time > 15*60:
+            if time.time() - create_time > 10*60:
                 error_num += 1
                 self.logger.error("[BuffAutoOnSale] BUFF发起steam报价失败, 报价ID: {}".format(order_id))
                 continue
