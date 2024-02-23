@@ -423,7 +423,7 @@ class BuffAutoOnSale:
         return {}
 
     def get_lowest_sell_price(self, goods_id, game="csgo", app_id=730, min_paint_wear=0, max_paint_wear=1.0):
-        box_id_list = [857515, 900464, 921379, 886606, 781534] # 常驻武器箱的id
+        box_id_list = [857515, 900464, 921379, 886606, 781534, 956398] # 常驻武器箱的id
         sleep_seconds_to_prevent_buff_ban = 10
         if 'sleep_seconds_to_prevent_buff_ban' in self.config["buff_auto_on_sale"]:
             sleep_seconds_to_prevent_buff_ban = self.config["buff_auto_on_sale"]["sleep_seconds_to_prevent_buff_ban"]
@@ -447,6 +447,8 @@ class BuffAutoOnSale:
                          str(sleep_seconds_to_prevent_buff_ban) + "秒")
         time.sleep(sleep_seconds_to_prevent_buff_ban)
         page_num = 1 if int(goods_id) not in box_id_list else 7
+        if int(goods_id) == 956398:
+            page_num = 5
         url = (
                 "https://buff.163.com/api/market/goods/sell_order?goods_id="
                 + str(goods_id)
