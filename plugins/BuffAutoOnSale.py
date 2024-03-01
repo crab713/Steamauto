@@ -368,6 +368,9 @@ class BuffAutoOnSale:
         if (cache is not None and sell_price > cache["price"] and cache["cache_time"] >=
                 datetime.datetime.now() - datetime.timedelta(minutes=10)):
             return {}
+        box_id_list = [857515, 900464, 921379, 886606, 781534, 956398] # 常驻武器箱的id
+        if int(goods_id) in box_id_list:
+            return {}
 
         sleep_seconds_to_prevent_buff_ban = 10
         if 'sleep_seconds_to_prevent_buff_ban' in self.config["buff_auto_on_sale"]:
