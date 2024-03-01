@@ -291,7 +291,7 @@ class BuffAutoOnSale:
             if sell_price == -1:
                 sell_price = self.get_lowest_sell_price(item["goods_id"], game, app_id, min_paint_wear, max_paint_wear)
             if supply_buy_orders and sell_price <= min_price:
-                highest_buy_order = self.get_highest_buy_order(item["goods_id"], sell_price, game, app_id, paint_wear=paint_wear,
+                highest_buy_order = self.get_highest_buy_order(item["goods_id"], sell_price-0.02, game, app_id, paint_wear=paint_wear,
                                                                 require_auto_accept=only_auto_accept,
                                                                 supported_payment_methods=supported_payment_method)
                 if "price" in highest_buy_order.keys() and sell_price <= float(highest_buy_order["price"]):
@@ -366,7 +366,7 @@ class BuffAutoOnSale:
                               supported_payment_methods=None):
         cache = mysql_client.get_highest_buy(goods_id)
         if (cache is not None and sell_price > cache["price"] and cache["cache_time"] >=
-                datetime.datetime.now() - datetime.timedelta(minutes=20)):
+                datetime.datetime.now() - datetime.timedelta(minutes=10)):
             return {}
 
         sleep_seconds_to_prevent_buff_ban = 10
