@@ -372,8 +372,8 @@ class BuffAutoAcceptOffer:
                                                         ),
                                                     )
                                                 if trades.index(trade) != len(trades) - 1:
-                                                    self.logger.info("[BuffAutoAcceptOffer] 为了避免频繁访问Steam接口, 等待5秒后继续...")
-                                                    time.sleep(5)
+                                                    self.logger.info("[BuffAutoAcceptOffer] 为了避免频繁访问Steam接口, 等待3秒后继续...")
+                                                    time.sleep(3)
                                                 continue
                                     else:
                                         self.logger.info("[BuffAutoAcceptOffer] 开发者模式已开启, 跳过报价物品检查")
@@ -402,8 +402,8 @@ class BuffAutoAcceptOffer:
                                             ),
                                         )
                                     if trades.index(trade) != len(trades) - 1:
-                                        self.logger.info("[BuffAutoAcceptOffer] 为了避免频繁访问Steam接口, 等待5秒后继续...")
-                                        time.sleep(5)
+                                        self.logger.info("[BuffAutoAcceptOffer] 为了避免频繁访问Steam接口, 等待3秒后继续...")
+                                        time.sleep(3)
                                 except Exception as e:
                                     self.logger.error(e, exc_info=True)
                                     self.logger.info("[BuffAutoAcceptOffer] 出现错误, 稍后再试! ")
@@ -441,8 +441,8 @@ class BuffAutoAcceptOffer:
                                         + " )"
                                     )
                             if list(trade_offer_to_confirm).index(trade_offer_id) != len(trade_offer_to_confirm) - 1:
-                                self.logger.info("[BuffAutoAcceptOffer] 为了避免频繁访问Steam接口, 等待5秒后继续...")
-                                time.sleep(5)
+                                self.logger.info("[BuffAutoAcceptOffer] 为了避免频繁访问Steam接口, 等待3秒后继续...")
+                                time.sleep(3)
                         else:
                             self.logger.info("[BuffAutoAcceptOffer] 该报价已经被处理过, 跳过.")
                 except ProxyError:

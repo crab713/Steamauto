@@ -435,7 +435,7 @@ class BuffAutoOnSale:
         if goods_key in self.lowest_price_cache:
             if int(goods_id) in box_id_list:
                 if (self.lowest_price_cache[goods_key]["cache_time"] >= datetime.datetime.now() -
-                        datetime.timedelta(minutes=5)):
+                        datetime.timedelta(minutes=3)):
                     lowest_price = self.lowest_price_cache[goods_key]["lowest_price"]
                     return lowest_price
             elif (self.lowest_price_cache[goods_key]["cache_time"] >= datetime.datetime.now() -
@@ -446,9 +446,9 @@ class BuffAutoOnSale:
         self.logger.info("[BuffAutoOnSale] 为了避免被封IP, 休眠" +
                          str(sleep_seconds_to_prevent_buff_ban) + "秒")
         time.sleep(sleep_seconds_to_prevent_buff_ban)
-        page_num = 1 if int(goods_id) not in box_id_list else 7
+        page_num = 1 if int(goods_id) not in box_id_list else 10
         if int(goods_id) == 956398:
-            page_num = 3
+            page_num = 5
         url = (
                 "https://buff.163.com/api/market/goods/sell_order?goods_id="
                 + str(goods_id)
