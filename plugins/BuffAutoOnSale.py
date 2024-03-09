@@ -294,7 +294,7 @@ class BuffAutoOnSale:
                 highest_buy_order = self.get_highest_buy_order(item["goods_id"], sell_price-0.02, game, app_id, paint_wear=paint_wear,
                                                                 require_auto_accept=only_auto_accept,
                                                                 supported_payment_methods=supported_payment_method)
-                if "price" in highest_buy_order.keys() and sell_price <= float(highest_buy_order["price"]):
+                if "price" in highest_buy_order.keys() and sell_price-0.02 <= float(highest_buy_order["price"]):
                     # 直接供应给最高报价
                     self.logger.info("[BuffAutoOnSale] 商品 " + item["market_hash_name"] +
                                         " 将供应给最高报价 " + str(highest_buy_order["price"]))
@@ -449,7 +449,7 @@ class BuffAutoOnSale:
         self.logger.info("[BuffAutoOnSale] 为了避免被封IP, 休眠" +
                          str(sleep_seconds_to_prevent_buff_ban) + "秒")
         time.sleep(sleep_seconds_to_prevent_buff_ban)
-        page_num = 1 if int(goods_id) not in box_id_list else 14
+        page_num = 1 if int(goods_id) not in box_id_list else 16
         if int(goods_id) == 956398:
             page_num = 7
         url = (
