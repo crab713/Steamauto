@@ -20,7 +20,6 @@ from utils.static import APPRISE_ASSET_FOLDER, BUFF_ACCOUNT_DEV_FILE_PATH, BUFF_
     SESSION_FOLDER
 from utils.tools import get_encoding
 
-from MysqlClient import mysql_client
 
 def format_str(text: str, trade):
     for good in trade["goods_infos"]:
@@ -364,7 +363,7 @@ class BuffAutoOnSale:
 
     def get_highest_buy_order(self, goods_id, sell_price, game="csgo", app_id=730, paint_wear=-1, require_auto_accept=True,
                               supported_payment_methods=None):
-        cache = mysql_client.get_highest_buy(goods_id)
+        cache = self.supply_price_cache.get(int(goods_id))
         if (cache is not None and sell_price > cache["price"] and cache["cache_time"] >=
                 datetime.datetime.now() - datetime.timedelta(minutes=10)):
             return {}
@@ -421,7 +420,7 @@ class BuffAutoOnSale:
                         break
                 if not match_specific:
                     continue
-            mysql_client.insert_highest_buy(goods_id, order["price"], int(time.time()))
+            self.supply_price_cache[int(goods_id)] = {"price": order["price"], "cache_time": datetime.datetime.now()}
             return order
         return {}
 
@@ -431,10 +430,6 @@ class BuffAutoOnSale:
         if 'sleep_seconds_to_prevent_buff_ban' in self.config["buff_auto_on_sale"]:
             sleep_seconds_to_prevent_buff_ban = self.config["buff_auto_on_sale"]["sleep_seconds_to_prevent_buff_ban"]
         goods_key = str(goods_id) + ',' + str(min_paint_wear) + ',' + str(max_paint_wear)
-        # 打补丁(
-        cache = mysql_client.get_lowest_sell(goods_key)
-        if cache is not None:
-            self.lowest_price_cache[goods_key] = cache
         if goods_key in self.lowest_price_cache:
             if int(goods_id) in box_id_list:
                 if (self.lowest_price_cache[goods_key]["cache_time"] >= datetime.datetime.now() -
@@ -449,9 +444,9 @@ class BuffAutoOnSale:
         self.logger.info("[BuffAutoOnSale] 为了避免被封IP, 休眠" +
                          str(sleep_seconds_to_prevent_buff_ban) + "秒")
         time.sleep(sleep_seconds_to_prevent_buff_ban)
-        page_num = 1 if int(goods_id) not in box_id_list else 16
+        page_num = 1 if int(goods_id) not in box_id_list else 12
         if int(goods_id) == 956398:
-            page_num = 7
+            page_num = 5
         url = (
                 "https://buff.163.com/api/market/goods/sell_order?goods_id="
                 + str(goods_id)
@@ -486,8 +481,6 @@ class BuffAutoOnSale:
             index = 3 if max_length > 3 else 0
             lowest_price = float(response_json["data"]["items"][index]["price"])
             self.lowest_price_cache[goods_key] = {"lowest_price": lowest_price, "cache_time": datetime.datetime.now()}
-            # 还是打补丁, cache不删(
-            mysql_client.insert_lowest_price(goods_key, lowest_price, int(time.time()))
             return lowest_price
         else:
             if response_json["code"] == "Captcha Validate Required":
