@@ -685,6 +685,7 @@ class BuffAutoOnSale:
             if resp_json["code"] == "OK":
                 self.unfinish_supply_order_list.append({"order_id":order_id, "create_time":time.time()})
                 self.logger.info("[BuffAutoOnSale] 发起steam报价成功! ")
+                time.sleep(10)
             return True
         else:
             self.logger.error(response_json)
