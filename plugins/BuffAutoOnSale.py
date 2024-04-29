@@ -449,9 +449,9 @@ class BuffAutoOnSale:
         self.logger.info("[BuffAutoOnSale] 为了避免被封IP, 休眠" +
                          str(sleep_seconds_to_prevent_buff_ban) + "秒")
         time.sleep(sleep_seconds_to_prevent_buff_ban)
-        page_num = 1 if int(goods_id) not in box_id_list else 12
+        page_num = 1 if int(goods_id) not in box_id_list else 8
         if int(goods_id) == 956398:
-            page_num = 7
+            page_num = 5
         url = (
                 "https://buff.163.com/api/market/goods/sell_order?goods_id="
                 + str(goods_id)
