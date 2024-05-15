@@ -45,15 +45,15 @@ def merge_buy_orders(response_data: dict):
     for order in orders:
         order["user"] = user_info[order["user_id"]]
         del order["user_id"]
-        pay_method = order["pay_method"]
-        if pay_method == 43:
-            order["supported_pay_method"] = ["支付宝", "微信"]
-        elif pay_method == 3:
-            order["supported_pay_method"] = ["支付宝"]
-        elif pay_method == 1:
-            order["supported_pay_method"] = ["微信"]
-        else:
-            order["supported_pay_method"] = []
+        # pay_method = order["pay_method"]
+        # if pay_method == 43:
+        #     order["supported_pay_method"] = ["支付宝", "微信"]
+        # elif pay_method == 3:
+        #     order["supported_pay_method"] = ["支付宝"]
+        # elif pay_method == 1:
+        #     order["supported_pay_method"] = ["微信"]
+        # else:
+        #     order["supported_pay_method"] = []
     return orders
 
 
@@ -397,13 +397,13 @@ class BuffAutoOnSale:
         for order in buy_orders:
             if require_auto_accept and not order["user"]["is_auto_accept"]:
                 continue
-            payment_method_supported = False
-            for supported_payment_method in supported_payment_methods:
-                if supported_payment_method in order["supported_pay_method"]:
-                    payment_method_supported = True
-                    break
-            if not payment_method_supported:
-                continue
+            # payment_method_supported = False
+            # for supported_payment_method in supported_payment_methods:
+            #     if supported_payment_method in order["supported_pay_method"]:
+            #         payment_method_supported = True
+            #         break
+            # if not payment_method_supported:
+            #     continue
             if len(order["specific"]) != 0:
                 match_specific = True
                 for specific in order["specific"]:
